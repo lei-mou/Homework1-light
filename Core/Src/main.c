@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "stm32f1xx_hal_gpio.h"
 #include "tim.h"
 #include "gpio.h"
 
@@ -55,35 +56,70 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-volatile uint16_t Led_enable = 0;
-uint32_t last_exti_time = 0;
+uint32_t last_press_time1 = 0;
+uint32_t last_press_time2 = 0;
+uint8_t is_first_press = 0;
+volatile uint8_t blue2 = 0;
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   if(GPIO_Pin == Key1_Pin)
   {
-    uint32_t current_time = HAL_GetTick();
-    if (current_time - last_exti_time >=20)
+    uint32_t current_time1 = HAL_GetTick();
+    if (current_time1 - last_press_time1 > 20)
     {
       if (HAL_GPIO_ReadPin(Key1_GPIO_Port, Key1_Pin) == GPIO_PIN_RESET)
       {
-        Led_enable = !Led_enable;
-        last_exti_time = current_time;
+        if (is_first_press == 0)
+        {
+          is_first_press = 1;
+          last_press_time1 = current_time1;
+        }else {
+          if (current_time1 - last_press_time1 < 500)
+          {
+            HAL_GPIO_TogglePin(Blue1_GPIO_Port, Blue1_Pin);
+            is_first_press = 0;
+          }else {
+            last_press_time1 = current_time1;
+          }
+        }
       }
     }
-
+  }
+  if(GPIO_Pin == Key2_Pin)
+  {
+    uint32_t current_time2 = HAL_GetTick();
+    if (current_time2 - last_press_time2 > 20)
+    {
+      if (HAL_GPIO_ReadPin(Key2_GPIO_Port, Key2_Pin) == GPIO_PIN_RESET)
+      {
+        last_press_time2 = current_time2;
+      }else if (HAL_GPIO_ReadPin(Key2_GPIO_Port, Key2_Pin) == GPIO_PIN_SET) {
+        if (current_time2 - last_press_time2 >= 1000)
+        {
+          blue2 = !blue2;
+          HAL_GPIO_WritePin(Blue2_GPIO_Port, Blue2_Pin, GPIO_PIN_RESET);
+        }else {
+          if (blue2 == 0)
+          {
+            HAL_GPIO_TogglePin(Blue2_GPIO_Port, Blue2_Pin);
+          }
+        }
+        last_press_time2 = current_time2;
+      }
+    }
   }
 }
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   if(htim == &htim2)
   {
-    if(Led_enable == 1)
+    HAL_GPIO_TogglePin(Green_GPIO_Port, Green_Pin);
+  }
+  if(htim == &htim3)
+  {
+    if (blue2 == 1)
     {
-    HAL_GPIO_TogglePin(Blue_GPIO_Port, Blue_Pin);
-    }
-    else 
-    {
-      HAL_GPIO_WritePin(Blue_GPIO_Port, Blue_Pin, GPIO_PIN_RESET);
+      HAL_GPIO_TogglePin(Blue2_GPIO_Port, Blue2_Pin);
     }
   }
 }
@@ -119,14 +155,18 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_TIM2_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim2);
+  HAL_TIM_Base_Start_IT(&htim3);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    HAL_GPIO_TogglePin(Red_GPIO_Port, Red_Pin);
+    HAL_Delay(250);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
